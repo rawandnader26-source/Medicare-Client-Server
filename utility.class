@@ -1,0 +1,157 @@
+import java.util.*;
+import java.util.function.Predicate;
+
+
+
+enum InsurancePlan {
+    PREMIUM, STANDARD, BASIC;
+
+    public static Optional<InsurancePlan> fromString(String text) {
+        return Arrays.stream(values())
+                .filter(plan -> plan.name().equalsIgnoreCase(text.trim()))
+                .findFirst();
+    }
+}
+
+
+record Patient(int id, String name, int age, InsurancePlan plan) {
+    @Override
+    public String toString() {
+        return String.format("| %-8d | %-18s | %-4d | %-10s |", id, name, age, plan);
+    }
+}
+
+
+class MedicareService {
+    private final Map<Integer, Patient> database = new HashMap<>();
+
+    public MedicareService() {
+        seedInitialData();
+    }
+
+    private void seedInitialData() {
+        register(new Patient(101, "Rawand", 25, InsurancePlan.BASIC));
+        register(new Patient(102, "Alaa", 21, InsurancePlan.PREMIUM));
+        register(new Patient(103, "Muhammed", 34, InsurancePlan.BASIC));
+        register(new Patient(104, "Wala", 43, InsurancePlan.PREMIUM));
+        register(new Patient(105, "Samar", 33, InsurancePlan.STANDARD));
+    }
+
+    public boolean register(Patient p) {
+        return database.putIfAbsent(p.id(), p) == null;
+    }
+
+    public Optional<Patient> find(int id) {
+        return Optional.ofNullable(database.get(id));
+    }
+
+    public boolean remove(int id) {
+        return database.remove(id) != null;
+    }
+
+    public List<Patient> getSortedDirectory() {
+        List<Patient> list = new ArrayList<>(database.values());
+        list.sort(Comparator.comparingInt(Patient::id));
+        return Collections.unmodifiableList(list);
+    }
+
+    public int getCount() {
+        return database.size();
+    }
+}
+
+public class MedicareApp {
+    private static final Scanner scanner = new Scanner(System.in);
+    private static final MedicareService service = new MedicareService();
+
+    public static void main(String[] args) {
+        while (true) {
+            printMenu();
+            String choice = scanner.nextLine();
+
+            switch (choice) {
+                case "1" -> handleRegistration();
+                case "2" -> displayDirectory();
+                case "3" -> handleSearch();
+                case "4" -> handleDeletion();
+                case "5" -> System.out.printf("%n[SYSTEM] Total Registered Patients: %d%n", service.getCount());
+                case "6" -> {
+                    System.out.println("Shutting down... Fi Aman Allah.");
+                    return;
+                }
+                default -> System.out.println("(!) Invalid selection. Please enter 1-6.");
+            }
+        }
+    }
+
+    private static void printMenu() {
+        System.out.println("\n" + "=".repeat(50));
+        System.out.println("         MEDICARE OMAN - MANAGEMENT SYSTEM");
+        System.out.println("=".repeat(50));
+        System.out.println(" 1. Register Patient     4. Delete Record");
+        System.out.println(" 2. View Directory       5. System Stats");
+        System.out.println(" 3. Search by ID         6. Exit");
+        System.out.print("Selection > ");
+    }
+
+    private static void handleRegistration() {
+        System.out.println("\n--- New Registration ---");
+        int id = readInt("Assign ID: ");
+        System.out.print("Full Name: ");
+        String name = scanner.nextLine();
+        int age = readInt("Age: ");
+
+        System.out.print("Plan (Premium/Standard/Basic): ");
+        InsurancePlan.fromString(scanner.nextLine()).ifPresentOrElse(
+            plan -> {
+                if (service.register(new Patient(id, name, age, plan))) {
+                    System.out.println("SUCCESS: Patient registered.");
+                } else {
+                    System.out.println("ERROR: ID " + id + " already exists.");
+                }
+            },
+            () -> System.out.println("ERROR: Invalid insurance plan entered.")
+        );
+    }
+
+    private static void displayDirectory() {
+        List<Patient> patients = service.getSortedDirectory();
+        if (patients.isEmpty()) {
+            System.out.println("The registry is currently empty.");
+            return;
+        }
+        System.out.println("\n____________________________________________________");
+        System.out.println("| ID       | Full Name          | Age  | Plan       |");
+        System.out.println("______________________________________________________");
+        patients.forEach(System.out::println);
+        System.out.println("________________________________________________________");
+    }
+
+    private static void handleSearch() {
+        int id = readInt("Enter ID to search: ");
+        service.find(id).ifPresentOrElse(
+            p -> System.out.println("FOUND: " + p),
+            () -> System.out.println("NOT FOUND: No record for ID " + id)
+        );
+    }
+
+    private static void handleDeletion() {
+        int id = readInt("Enter ID to delete: ");
+        if (service.remove(id)) {
+            System.out.println("SUCCESS: Record removed.");
+        } else {
+            System.out.println("ERROR: ID not found.");
+        }
+    }
+
+    private static int readInt(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            try {
+                return Integer.parseInt(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                System.out.println("(!) Input Error: Please enter a valid number.");
+            }
+        }
+    }
+}
